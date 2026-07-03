@@ -97,6 +97,15 @@ const shuffleBlocks = (currentBlocks: NumberBlock[]): NumberBlock[] => {
   return arr;
 };
 
+const getDeviceId = () => {
+  let id = localStorage.getItem('speedtap_device_id');
+  if (!id) {
+    id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('speedtap_device_id', id);
+  }
+  return id;
+};
+
 export default function App() {
   // Game state
   const [gameStatus, setGameStatus] = useState<GameStatus>('idle');
@@ -139,7 +148,8 @@ export default function App() {
           time: data.time,
           accuracy: data.accuracy,
           date: data.date,
-          isPlayer: data.isPlayer || false,
+          isPlayer: data.deviceId === getDeviceId(),
+          deviceId: data.deviceId,
           mode: (data.mode as GameMode) || 'classic',
         });
       });
@@ -360,7 +370,7 @@ export default function App() {
       time: finalTime,
       accuracy: finalAccuracy,
       date: new Date().toISOString().split('T')[0],
-      isPlayer: true,
+      deviceId: getDeviceId(),
       mode: gameMode,
     };
 
@@ -368,6 +378,7 @@ export default function App() {
     const clientRecord: LeaderboardEntry = {
       id: `record-${Date.now()}`,
       ...newRecord,
+      isPlayer: true,
     };
     const updatedLeaderboard = [...leaderboard, clientRecord];
     setLeaderboard(updatedLeaderboard);

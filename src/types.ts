@@ -7,6 +7,7 @@ export interface LeaderboardEntry {
   accuracy: number; // percentage
   date: string;
   isPlayer?: boolean;
+  deviceId?: string;
   mode?: GameMode;
 }
 
