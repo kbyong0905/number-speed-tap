@@ -144,24 +144,8 @@ export default function App() {
         });
       });
 
-      if (entries.length > 0) {
-        setLeaderboard(entries);
-        localStorage.setItem('speedtap_leaderboard', JSON.stringify(entries));
-      } else {
-        // Seed initial data to Firestore
-        setLeaderboard(DEFAULT_LEADERBOARD);
-        localStorage.setItem('speedtap_leaderboard', JSON.stringify(DEFAULT_LEADERBOARD));
-        for (const bot of DEFAULT_LEADERBOARD) {
-          await addDoc(collection(db, 'leaderboard'), {
-            name: bot.name,
-            time: bot.time,
-            accuracy: bot.accuracy,
-            date: bot.date,
-            isPlayer: false,
-            mode: bot.mode || 'classic',
-          });
-        }
-      }
+      setLeaderboard(entries);
+      localStorage.setItem('speedtap_leaderboard', JSON.stringify(entries));
     } catch (error) {
       console.error('Error loading cloud leaderboard:', error);
       try {
