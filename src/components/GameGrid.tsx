@@ -29,7 +29,7 @@ export default function GameGrid({ blocks, nextNumber, onTapNumber, gameStatus }
   return (
     <div className="w-full select-none" id="speed-tap-grid-container">
       {/* Grid of Numbers */}
-      <div className="grid grid-cols-5 gap-2 sm:gap-3 bg-black border border-neutral-900 p-3 sm:p-4 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+      <div className="grid grid-cols-5 gap-2 sm:gap-3 bg-base border border-border-subtle p-3 sm:p-4 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)]">
         {blocks.map((block, index) => {
           const isError = errorIndex === index;
 
@@ -45,10 +45,10 @@ export default function GameGrid({ blocks, nextNumber, onTapNumber, gameStatus }
                 aspect-square flex flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all duration-150 cursor-pointer text-center relative overflow-hidden
                 ${
                   block.isCompleted
-                    ? 'bg-neutral-950 border border-neutral-950 text-neutral-950 pointer-events-none opacity-0'
+                    ? 'bg-base border border-border-subtle opacity-0 pointer-events-none'
                     : isError
                     ? 'bg-red-950 border border-red-500 text-red-200 animate-wiggle z-20 shadow-[0_0_15px_rgba(239,68,68,0.4)]'
-                    : 'bg-neutral-900 border border-neutral-800 text-white font-bold hover:bg-neutral-800 hover:border-neutral-700 active:scale-95'
+                    : 'bg-panel border border-border-subtle text-primary font-bold hover:bg-surface hover:border-border-active active:scale-95'
                 }
               `}
               id={`tap-block-${block.value}`}

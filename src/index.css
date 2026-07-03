@@ -4,6 +4,48 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-base: var(--theme-bg-base);
+  --color-surface: var(--theme-bg-surface);
+  --color-panel: var(--theme-bg-panel);
+  --color-primary: var(--theme-text-primary);
+  --color-muted: var(--theme-text-muted);
+  --color-border-subtle: var(--theme-border-subtle);
+  --color-border-active: var(--theme-border-active);
+  --color-accent: var(--theme-accent);
+}
+
+:root {
+  /* Midnight (Default) */
+  --theme-bg-base: #020617;
+  --theme-bg-surface: #0f172a;
+  --theme-bg-panel: #1e293b;
+  --theme-text-primary: #f8fafc;
+  --theme-text-muted: #94a3b8;
+  --theme-border-subtle: #334155;
+  --theme-border-active: #cbd5e1;
+  --theme-accent: #38bdf8;
+}
+
+[data-theme="cyberpunk"] {
+  --theme-bg-base: #0f0a1e;
+  --theme-bg-surface: #1f103b;
+  --theme-bg-panel: #2d1656;
+  --theme-text-primary: #ff00ff;
+  --theme-text-muted: #a453cc;
+  --theme-border-subtle: #5f2b8e;
+  --theme-border-active: #00ffff;
+  --theme-accent: #00ffff;
+}
+
+[data-theme="light"] {
+  --theme-bg-base: #f0f4f8;
+  --theme-bg-surface: #ffffff;
+  --theme-bg-panel: #e8edf2;
+  --theme-text-primary: #0f172a;
+  --theme-text-muted: #4a5568;
+  --theme-border-subtle: #cbd5e0;
+  --theme-border-active: #2d3748;
+  --theme-accent: #2563eb;
 }
 
 /* Custom Webkit/Haptic animations for high performance */
@@ -60,10 +102,10 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Base custom styles to guarantee pitch black theme */
+/* Base custom styles */
 body {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--theme-bg-base);
+  color: var(--theme-text-primary);
   overflow-x: hidden;
   font-family: var(--font-sans);
 }

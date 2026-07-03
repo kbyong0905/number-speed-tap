@@ -59,18 +59,10 @@ import {
   ArrowDown,
   Layers,
   Zap,
+  Palette,
 } from 'lucide-react';
 
-const DEFAULT_LEADERBOARD: LeaderboardEntry[] = [
-  { id: 'bot-1', name: 'ReflexGod ⚡', time: 7.843, accuracy: 100, date: '2026-06-30', mode: 'classic' },
-  { id: 'bot-2', name: 'TappingTornado 🌪️', time: 10.125, accuracy: 100, date: '2026-07-01', mode: 'classic' },
-  { id: 'bot-3', name: 'ApexReflex 🐺', time: 13.910, accuracy: 96.8, date: '2026-06-28', mode: 'classic' },
-  { id: 'bot-4', name: 'VelocityX 🚀', time: 16.540, accuracy: 93.8, date: '2026-07-01', mode: 'classic' },
-  { id: 'bot-5', name: 'SonicBoom ⏱️', time: 19.825, accuracy: 100, date: '2026-06-25', mode: 'classic' },
-  { id: 'bot-6', name: 'ReverseRanger ↩️', time: 9.124, accuracy: 100, date: '2026-06-30', mode: 'reverse' },
-  { id: 'bot-7', name: 'EvenOddElite 🔢', time: 11.450, accuracy: 100, date: '2026-07-01', mode: 'even_odd' },
-  { id: 'bot-8', name: 'ShuffleShogun 🔀', time: 14.890, accuracy: 100, date: '2026-07-02', mode: 'shuffle' },
-];
+const DEFAULT_LEADERBOARD: LeaderboardEntry[] = [];
 
 const getSequenceForMode = (mode: GameMode): number[] => {
   switch (mode) {
@@ -117,6 +109,7 @@ export default function App() {
   const [totalTaps, setTotalTaps] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [theme, setTheme] = useState<string>(() => localStorage.getItem('speedtap_theme') || 'midnight');
 
   // Leaderboard state
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -134,6 +127,11 @@ export default function App() {
   // High precision timer refs
   const timerRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('speedtap_theme', theme);
+  }, [theme]);
 
   const fetchFirestoreLeaderboard = async () => {
     try {
@@ -430,7 +428,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black flex flex-col justify-between py-6 px-4 md:px-8 relative" id="speed-tap-app">
+    <div className="min-h-screen bg-base text-primary selection:bg-accent/30 selection:text-primary flex flex-col justify-between py-6 px-4 md:px-8 relative" id="speed-tap-app">
       {/* Confetti elements when run completed */}
       {gameStatus === 'completed' && confetti.map((p) => (
         <div
@@ -459,15 +457,15 @@ export default function App() {
       `}</style>
 
       {/* Top Header Navbar */}
-      <header className="max-w-5xl w-full mx-auto flex items-center justify-between border-b border-neutral-900 pb-5 mb-6" id="app-header">
+      <header className="max-w-5xl w-full mx-auto flex items-center justify-between border-b border-border-subtle pb-5 mb-6" id="app-header">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-border-active text-base shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
             <h1 className="text-xl font-black tracking-wider uppercase font-sans">
               Speed Tap
             </h1>
           </div>
-          <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mt-0.5">
+          <span className="text-[10px] font-mono text-muted uppercase tracking-widest mt-0.5">
             Reflex Precision Protocol 1-30
           </span>
         </div>
@@ -475,8 +473,20 @@ export default function App() {
         {/* Audio / System controls */}
         <div className="flex items-center gap-3">
           <button
+            onClick={() => {
+              const themes = ['midnight', 'cyberpunk', 'light'];
+              setTheme(themes[(themes.indexOf(theme) + 1) % themes.length]);
+            }}
+            className="p-2 rounded-xl border border-border-subtle text-muted hover:text-primary hover:border-border-active transition-colors cursor-pointer flex items-center gap-1.5"
+            id="btn-toggle-theme"
+            title="Toggle Theme"
+          >
+            <Palette className="w-4 h-4" />
+            <span className="text-[10px] font-mono hidden sm:inline-block capitalize">{theme}</span>
+          </button>
+          <button
             onClick={toggleMuted}
-            className="p-2 rounded-xl border border-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-700 transition-colors cursor-pointer"
+            className="p-2 rounded-xl border border-border-subtle text-muted hover:text-primary hover:border-border-active transition-colors cursor-pointer"
             id="btn-toggle-audio"
             title={isMuted ? 'Unmute Sound Effects' : 'Mute Sound Effects'}
           >
@@ -484,7 +494,7 @@ export default function App() {
           </button>
           <button
             onClick={resetGame}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-700 transition-colors font-mono text-xs cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border-subtle text-muted hover:text-primary hover:border-border-active transition-colors font-mono text-xs cursor-pointer"
             id="btn-restart-game"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -495,15 +505,16 @@ export default function App() {
 
       {/* Mode Selection Dashboard - Visible when idle */}
       <div className="max-w-5xl w-full mx-auto mb-6" id="game-dashboard-header">
-        <div className="p-4 bg-neutral-950/80 border border-neutral-900 rounded-2xl" id="game-mode-selector-panel">
-          <div className="flex items-center justify-between mb-3 border-b border-neutral-900 pb-2">
-            <div className="flex items-center gap-1.5 text-xs font-mono text-neutral-400">
-              <Sparkles className="w-3.5 h-3.5 text-neutral-300" />
-              <span>Select Reflex Challenge Mode</span>
+        <div className="p-4 bg-base/80 border border-border-subtle rounded-2xl" id="game-mode-selector-panel">
+          <div className="flex items-center justify-between mb-4 border-b border-border-subtle pb-3">
+            <div className="flex items-center gap-2 text-xs font-mono text-muted">
+              <Sparkles className="w-4 h-4 text-accent animate-pulse" />
+              <span className="font-bold text-primary uppercase tracking-wider">Select Challenge Mode</span>
+              <span className="bg-accent text-base px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest animate-bounce">Play Me</span>
             </div>
             {bestTime !== null && (
-              <div className="flex items-center gap-1 text-[10px] font-mono text-yellow-400 font-semibold bg-yellow-400/5 px-2 py-0.5 rounded border border-yellow-400/10">
-                <Flame className="w-3 h-3 animate-pulse" />
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-400 font-semibold bg-yellow-400/5 px-2.5 py-1 rounded border border-yellow-400/20 shadow-[0_0_10px_rgba(250,204,21,0.1)]">
+                <Flame className="w-3.5 h-3.5 animate-pulse" />
                 <span>PB: {bestTime.toFixed(3)}s</span>
               </div>
             )}
@@ -549,20 +560,20 @@ export default function App() {
                       sfx.playCountdown();
                     }
                   }}
-                  className={`flex flex-col text-left p-3 rounded-xl border transition-all relative overflow-hidden ${
+                  className={`group flex flex-col text-left p-3 rounded-xl border transition-all duration-300 relative overflow-hidden transform hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(0,0,0,0.5)] ${
                     active
-                      ? 'bg-neutral-900 border-white text-white shadow-[0_0_15px_rgba(255,255,255,0.05)]'
-                      : 'bg-neutral-950/40 border-neutral-900 text-neutral-400 hover:border-neutral-800 hover:text-white'
+                      ? 'bg-surface border-accent text-primary shadow-[0_0_15px_var(--theme-accent)] scale-[1.02] z-10 ring-1 ring-accent'
+                      : 'bg-base border-border-subtle text-muted hover:border-accent hover:text-primary hover:bg-surface/80'
                   } cursor-pointer`}
                   id={`mode-card-${m.id}`}
                 >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className={`p-1 rounded bg-neutral-900 border ${active ? 'border-white/20' : 'border-neutral-900'}`}>
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className={`p-1.5 rounded-lg border transition-colors ${active ? 'bg-panel border-accent/30 shadow-inner' : 'bg-surface border-border-subtle group-hover:border-accent/50'}`}>
                       {m.icon}
                     </div>
-                    <span className="font-bold text-xs sm:text-sm">{m.label}</span>
+                    <span className="font-black text-sm tracking-wide">{m.label}</span>
                   </div>
-                  <p className="text-[10px] text-neutral-500 font-mono leading-tight flex-1">
+                  <p className="text-[10px] text-muted font-mono leading-tight flex-1">
                     {m.desc}
                   </p>
                 </button>
@@ -589,17 +600,17 @@ export default function App() {
           />
 
           {/* Target Sequence Queue Indicator */}
-          <div className="mb-4 bg-neutral-950 border border-neutral-900 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="target-queue-indicator">
+          <div className="mb-4 bg-base border border-border-subtle p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="target-queue-indicator">
             <div className="flex items-center gap-2 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-              <span className="text-[11px] uppercase tracking-wider font-mono text-neutral-400">Target Order:</span>
-              <span className="text-xs font-bold text-white font-mono uppercase bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+              <span className="w-2 h-2 rounded-full bg-border-active text-base shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+              <span className="text-[11px] uppercase tracking-wider font-mono text-muted">Target Order:</span>
+              <span className="text-xs font-bold text-primary font-mono uppercase bg-surface px-2 py-0.5 rounded border border-border-subtle">
                 {getModeLabel(gameMode)}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 font-mono max-w-full custom-scrollbar">
-              <span className="text-[10px] text-neutral-500 uppercase shrink-0 mr-1">Queue:</span>
+              <span className="text-[10px] text-muted uppercase shrink-0 mr-1">Queue:</span>
               {activeSequence.slice(currentSeqIndex, currentSeqIndex + 6).map((num, idx) => {
                 const isCurrent = idx === 0;
                 return (
@@ -607,8 +618,8 @@ export default function App() {
                     <div
                       className={`flex items-center justify-center w-7 h-7 rounded font-bold transition-all ${
                         isCurrent
-                          ? 'bg-white text-black text-xs scale-110 shadow-[0_0_8px_rgba(255,255,255,0.3)] animate-pulse'
-                          : 'bg-neutral-900 text-neutral-400 text-[11px] border border-neutral-800/80'
+                          ? 'bg-border-active text-base text-base text-xs scale-110 shadow-[0_0_8px_rgba(255,255,255,0.3)] animate-pulse'
+                          : 'bg-surface text-muted text-[11px] border border-border-subtle/80'
                       }`}
                     >
                       {num}
@@ -652,31 +663,31 @@ export default function App() {
 
       {/* Modal: Save Record Popup */}
       {showSaveModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="save-score-modal">
-          <div className="bg-neutral-950 border border-neutral-800 rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl overflow-hidden animate-scale-pop">
+        <div className="fixed inset-0 bg-base/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="save-score-modal">
+          <div className="bg-base border border-border-subtle rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl overflow-hidden animate-scale-pop">
             
             {/* Top Close */}
             <button
               onClick={() => setShowSaveModal(false)}
-              className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors cursor-pointer"
+              className="absolute top-4 right-4 text-muted hover:text-primary transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 bg-accent/15 border border-accent/30 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Award className="w-6 h-6 text-yellow-400" />
               </div>
-              <h3 className="text-xl font-bold uppercase tracking-wider text-white font-sans">
+              <h3 className="text-xl font-bold uppercase tracking-wider text-primary font-sans">
                 Record Achieved!
               </h3>
-              <p className="text-xs text-neutral-400 font-mono mt-1">
-                You completed the <span className="text-white underline">{getModeLabel(gameMode)}</span> reflex protocol.
+              <p className="text-xs text-muted font-mono mt-1">
+                You completed the <span className="text-primary underline">{getModeLabel(gameMode)}</span> reflex protocol.
               </p>
               
               {/* Dynamically assigned rank */}
-              <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold font-mono bg-white/5 border border-neutral-800">
-                <span className="text-neutral-500 text-xs uppercase">Rank Tier:</span>
+              <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold font-mono bg-surface border border-border-subtle">
+                <span className="text-muted text-xs uppercase">Rank Tier:</span>
                 <span className={`${getRankByTime(finalTime).color}`}>
                   {getRankByTime(finalTime).name}
                 </span>
@@ -684,21 +695,21 @@ export default function App() {
             </div>
 
             {/* Score Summary Metrics */}
-            <div className="grid grid-cols-2 gap-4 bg-neutral-900 border border-neutral-800 p-4 rounded-2xl mb-6 text-center">
+            <div className="grid grid-cols-2 gap-4 bg-surface border border-border-subtle p-4 rounded-2xl mb-6 text-center">
               <div>
-                <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-mono">Time Elapsed</p>
-                <p className="text-2xl font-black text-white font-mono mt-0.5">{finalTime.toFixed(3)}s</p>
+                <p className="text-[10px] text-muted uppercase tracking-widest font-mono">Time Elapsed</p>
+                <p className="text-2xl font-black text-primary font-mono mt-0.5">{finalTime.toFixed(3)}s</p>
               </div>
               <div>
-                <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-mono">Accuracy</p>
-                <p className="text-2xl font-black text-white font-mono mt-0.5">{finalAccuracy.toFixed(1)}%</p>
+                <p className="text-[10px] text-muted uppercase tracking-widest font-mono">Accuracy</p>
+                <p className="text-2xl font-black text-primary font-mono mt-0.5">{finalAccuracy.toFixed(1)}%</p>
               </div>
             </div>
 
             {/* Name Input Form */}
             <form onSubmit={handleSaveScore} className="space-y-4">
               <div>
-                <label className="block text-xs uppercase tracking-wider font-mono text-neutral-400 mb-1.5">
+                <label className="block text-xs uppercase tracking-wider font-mono text-muted mb-1.5">
                   Enter Pilot Name
                 </label>
                 <input
@@ -708,7 +719,7 @@ export default function App() {
                   placeholder="e.g., TapperOne"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-mono text-center"
+                  className="w-full bg-surface border border-border-subtle rounded-xl px-4 py-3 text-sm text-primary placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-mono text-center"
                   id="player-name-input"
                 />
               </div>
@@ -717,13 +728,13 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowSaveModal(false)}
-                  className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer border border-neutral-800"
+                  className="flex-1 py-3 bg-surface hover:bg-panel text-muted hover:text-primary font-bold rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer border border-border-subtle"
                 >
                   Discard
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-white text-black hover:bg-neutral-200 font-black rounded-xl text-xs uppercase tracking-widest transition-colors cursor-pointer"
+                  className="flex-1 py-3 bg-accent text-base hover:opacity-90 font-black rounded-xl text-xs uppercase tracking-widest transition-opacity cursor-pointer"
                   id="btn-submit-score"
                 >
                   Save Record
@@ -735,7 +746,7 @@ export default function App() {
       )}
 
       {/* Footer Instructions / Pro-Tips */}
-      <footer className="max-w-5xl w-full mx-auto border-t border-neutral-900 pt-5 mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 font-mono">
+      <footer className="max-w-5xl w-full mx-auto border-t border-border-subtle pt-5 mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted font-mono">
         <p>© 2026 Speed Tap Protocol. Crafted for ultimate reflex speed.</p>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1">
