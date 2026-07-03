@@ -14,6 +14,7 @@ export default function Leaderboard({ entries, onReset, currentScore, selectedMo
   const [searchTerm, setSearchTerm] = useState('');
   const [showRanksLegend, setShowRanksLegend] = useState(false);
   const [activeTab, setActiveTab] = useState<GameMode | 'all'>('all');
+  const [activeTier, setActiveTier] = useState<string>('all');
 
   // Sync active leaderboard tab with the selected game mode when it changes
   useEffect(() => {
@@ -33,9 +34,14 @@ export default function Leaderboard({ entries, onReset, currentScore, selectedMo
     return b.accuracy - a.accuracy;
   });
 
-  const filteredEntries = sortedEntries.filter((entry) =>
-    entry.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEntries = sortedEntries.filter((entry) => {
+    const matchesSearch = entry.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+    
+    if (activeTier === 'all') return true;
+    const entryTier = getRankByTime(entry.time).name.split(' ')[0].toLowerCase();
+    return entryTier === activeTier.toLowerCase();
+  });
 
   const getRankBadge = (rank: number) => {
     switch (rank) {
@@ -201,17 +207,31 @@ export default function Leaderboard({ entries, onReset, currentScore, selectedMo
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted" />
-        <input
-          type="text"
-          placeholder="Filter players by name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-base border border-border-subtle rounded-xl pl-9 pr-4 py-2 text-sm text-primary placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-mono transition-all"
-          id="search-players-input"
-        />
+      {/* Search and Filter */}
+      <div className="flex gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted" />
+          <input
+            type="text"
+            placeholder="Filter players..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-base border border-border-subtle rounded-xl pl-9 pr-4 py-2 text-sm text-primary placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-mono transition-all"
+            id="search-players-input"
+          />
+        </div>
+        <select
+          value={activeTier}
+          onChange={(e) => setActiveTier(e.target.value)}
+          className="bg-base border border-border-subtle rounded-xl px-3 py-2 text-sm text-primary font-mono focus:outline-none focus:border-neutral-500 cursor-pointer max-w-[120px]"
+          title="Filter by Rank Tier"
+        >
+          <option value="all">All Tiers</option>
+          {RANK_TIERS.map(tier => {
+            const tierName = tier.name.split(' ')[0];
+            return <option key={tierName} value={tierName.toLowerCase()}>{tierName}</option>;
+          })}
+        </select>
       </div>
 
       {/* Rankings Table */}
