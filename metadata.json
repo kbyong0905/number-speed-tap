@@ -1,0 +1,6 @@
+{
+  "name": "Speed Tap",
+  "description": "A high-speed precision tapping game where users click numbers 1 to 30 as fast as possible, with a real-time timer and rankings leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
