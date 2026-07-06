@@ -21,3 +21,24 @@ export interface NumberBlock {
   offsetY: number;
   scale: number;
 }
+
+export type PlayerStatus = 'waiting' | 'ready' | 'playing' | 'completed';
+
+export interface PlayerState {
+  id: string;
+  name: string;
+  status: PlayerStatus;
+  progress: number; // 0 to 30
+  time: number | null;
+  accuracy: number | null;
+}
+
+export interface Room {
+  roomId: string;
+  host: PlayerState | null;
+  guest: PlayerState | null;
+  gameMode: GameMode;
+  status: 'waiting' | 'starting' | 'playing' | 'finished';
+  winnerId: string | null;
+  createdAt: number;
+}

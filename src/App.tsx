@@ -60,7 +60,12 @@ import {
   Layers,
   Zap,
   Palette,
+  Users
 } from 'lucide-react';
+
+import { useMultiplayer } from './hooks/useMultiplayer';
+import MultiplayerLobby from './components/MultiplayerLobby';
+import MultiplayerMatch from './components/MultiplayerMatch';
 
 const DEFAULT_LEADERBOARD: LeaderboardEntry[] = [];
 
@@ -115,9 +120,13 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [bestTime, setBestTime] = useState<number | null>(null);
 
+  // Multiplayer state
+  const [isMultiplayerView, setIsMultiplayerView] = useState<boolean>(false);
+  const [playerName, setPlayerName] = useState<string>('');
+  const mp = useMultiplayer(getDeviceId(), playerName);
+
   // Modal / Score saving states
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
-  const [playerName, setPlayerName] = useState<string>('');
   const [finalTime, setFinalTime] = useState<number>(0);
   const [finalAccuracy, setFinalAccuracy] = useState<number>(100);
 
@@ -275,13 +284,48 @@ export default function App() {
     }, 800);
   };
 
+  // Multiplayer Room Status Watcher
+  useEffect(() => {
+    if (mp.room?.status === 'starting' && gameStatus === 'idle') {
+      // Sync game mode if guest
+      if (mp.room.host?.id !== getDeviceId()) {
+        setGameMode(mp.room.gameMode);
+      }
+
+      // Both are ready, start countdown
+      resetGame();
+      setCountdown(3);
+      sfx.playCountdown();
+
+      let count = 3;
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          setCountdown(count);
+          sfx.playCountdown();
+        } else if (count === 0) {
+          setCountdown(null);
+          setGameStatus('playing');
+          startHighPrecisionTimer();
+          sfx.playGo();
+          // Host signals the room is now officially playing
+          if (mp.room?.host?.id === getDeviceId()) {
+            mp.startGame();
+          }
+        } else {
+          clearInterval(interval);
+        }
+      }, 800);
+    }
+  }, [mp.room?.status]);
+
   const activeSequence = getSequenceForMode(gameMode);
   const nextNumber = activeSequence[currentSeqIndex] || activeSequence[activeSequence.length - 1];
 
   // Core callback when user clicks a grid tile
   const handleTapNumber = (value: number, index: number) => {
-    // Start the timer automatically on the first tap of any kind if the game is in 'idle' status
-    if (gameStatus === 'idle') {
+    // Start the timer automatically on the first tap of any kind if the game is in 'idle' status (Solo only)
+    if (gameStatus === 'idle' && (!isMultiplayerView || !mp.room)) {
       setGameStatus('playing');
       startHighPrecisionTimer();
     }
@@ -328,12 +372,20 @@ export default function App() {
           localStorage.setItem(storedBestKey, String(finalT));
         }
 
-        // Open save score prompt modal
-        setTimeout(() => {
-          setShowSaveModal(true);
-        }, 1000);
+        if (mp.room && isMultiplayerView) {
+          mp.finishGame(finalT, accuracyPct);
+        } else {
+          // Open save score prompt modal for Solo only
+          setTimeout(() => {
+            setShowSaveModal(true);
+          }, 1000);
+        }
       } else {
-        setCurrentSeqIndex((prev) => prev + 1);
+        const nextIndex = currentSeqIndex + 1;
+        setCurrentSeqIndex(nextIndex);
+        if (mp.room && isMultiplayerView) {
+          mp.updateProgress(nextIndex);
+        }
       }
     } else {
       // Wrong number clicked (Only tally if not already completed)
@@ -493,6 +545,22 @@ export default function App() {
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
           <button
+            onClick={() => {
+              setIsMultiplayerView(!isMultiplayerView);
+              if (isMultiplayerView && mp.room) {
+                mp.leaveRoom();
+              }
+              resetGame();
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-colors font-mono text-xs cursor-pointer ${isMultiplayerView
+                ? 'bg-accent/20 border-accent text-accent shadow-[0_0_10px_var(--theme-accent)]'
+                : 'border-border-subtle text-muted hover:text-primary hover:border-border-active'
+              }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            {isMultiplayerView ? 'Solo' : 'Multiplayer'}
+          </button>
+          <button
             onClick={resetGame}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border-subtle text-muted hover:text-primary hover:border-border-active transition-colors font-mono text-xs cursor-pointer"
             id="btn-restart-game"
@@ -504,168 +572,189 @@ export default function App() {
       </header>
 
       {/* Mode Selection Dashboard - Visible when idle */}
-      <div className="max-w-5xl w-full mx-auto mb-6" id="game-dashboard-header">
-        <div className="p-4 bg-base/80 border border-border-subtle rounded-2xl" id="game-mode-selector-panel">
-          <div className="flex items-center justify-between mb-4 border-b border-border-subtle pb-3">
-            <div className="flex items-center gap-2 text-xs font-mono text-muted">
-              <Sparkles className="w-4 h-4 text-accent animate-pulse" />
-              <span className="font-bold text-primary uppercase tracking-wider">Select Challenge Mode</span>
-              <span className="bg-accent text-base px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest animate-bounce">Play Me</span>
-            </div>
-            {bestTime !== null && (
-              <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-400 font-semibold bg-yellow-400/5 px-2.5 py-1 rounded border border-yellow-400/20 shadow-[0_0_10px_rgba(250,204,21,0.1)]">
-                <Flame className="w-3.5 h-3.5 animate-pulse" />
-                <span>PB: {bestTime.toFixed(3)}s</span>
-              </div>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {[
-              {
-                id: 'classic',
-                label: 'Classic',
-                desc: 'Tap 1 to 30 in ascending order. Pure speed and visual scanning.',
-                icon: <ArrowDown className="w-4 h-4 text-green-400" />,
-              },
-              {
-                id: 'reverse',
-                label: 'Reverse',
-                desc: 'Tap 30 to 1 in descending order. Reverse scanning patterns.',
-                icon: <RotateCcw className="w-4 h-4 text-cyan-400 animate-spin-slow" />,
-              },
-              {
-                id: 'even_odd',
-                label: 'Even & Odd',
-                desc: 'Odds first (1, 3, 5...), then Evens (2, 4, 6...). Extreme sorting.',
-                icon: <Layers className="w-4 h-4 text-purple-400" />,
-              },
-              {
-                id: 'shuffle',
-                label: 'Shuffle',
-                desc: 'Grid reshuffles after every correct tap! True muscle memory breaker.',
-                icon: <Shuffle className="w-4 h-4 text-amber-400 animate-pulse" />,
-              },
-            ].map((m) => {
-              const active = gameMode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    if (gameStatus === 'idle' || gameStatus === 'completed') {
-                      setGameMode(m.id as GameMode);
-                      sfx.playCountdown();
-                    } else if (window.confirm('Abandon active game to switch modes?')) {
-                      setGameMode(m.id as GameMode);
-                      sfx.playCountdown();
-                    }
-                  }}
-                  className={`group flex flex-col text-left p-3 rounded-xl border transition-all duration-300 relative overflow-hidden transform hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(0,0,0,0.5)] ${
-                    active
-                      ? 'bg-surface border-accent text-primary shadow-[0_0_15px_var(--theme-accent)] scale-[1.02] z-10 ring-1 ring-accent'
-                      : 'bg-base border-border-subtle text-muted hover:border-accent hover:text-primary hover:bg-surface/80'
-                  } cursor-pointer`}
-                  id={`mode-card-${m.id}`}
-                >
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className={`p-1.5 rounded-lg border transition-colors ${active ? 'bg-panel border-accent/30 shadow-inner' : 'bg-surface border-border-subtle group-hover:border-accent/50'}`}>
-                      {m.icon}
-                    </div>
-                    <span className="font-black text-sm tracking-wide">{m.label}</span>
+      {gameStatus === 'idle' && (
+        isMultiplayerView ? (
+          <MultiplayerLobby
+            userId={getDeviceId()}
+            room={mp.room}
+            error={mp.error}
+            createRoom={mp.createRoom}
+            joinRoom={mp.joinRoom}
+            setReady={mp.setReady}
+            leaveRoom={mp.leaveRoom}
+            onBack={() => setIsMultiplayerView(false)}
+            userName={playerName}
+            setUserName={setPlayerName}
+          />
+        ) : (
+          <div className="max-w-5xl w-full mx-auto mb-6" id="game-dashboard-header">
+            <div className="p-4 bg-base/80 border border-border-subtle rounded-2xl" id="game-mode-selector-panel">
+              <div className="flex items-center justify-between mb-4 border-b border-border-subtle pb-3">
+                <div className="flex items-center gap-2 text-xs font-mono text-muted">
+                  <Sparkles className="w-4 h-4 text-accent animate-pulse" />
+                  <span className="font-bold text-primary uppercase tracking-wider">Select Challenge Mode</span>
+                  <span className="bg-accent text-base px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest animate-bounce">Play Me</span>
+                </div>
+                {bestTime !== null && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-400 font-semibold bg-yellow-400/5 px-2.5 py-1 rounded border border-yellow-400/20 shadow-[0_0_10px_rgba(250,204,21,0.1)]">
+                    <Flame className="w-3.5 h-3.5 animate-pulse" />
+                    <span>PB: {bestTime.toFixed(3)}s</span>
                   </div>
-                  <p className="text-[10px] text-muted font-mono leading-tight flex-1">
-                    {m.desc}
-                  </p>
-                </button>
-              );
-            })}
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                {[
+                  {
+                    id: 'classic',
+                    label: 'Classic',
+                    desc: 'Tap 1 to 30 in ascending order. Pure speed and visual scanning.',
+                    icon: <ArrowDown className="w-4 h-4 text-green-400" />,
+                  },
+                  {
+                    id: 'reverse',
+                    label: 'Reverse',
+                    desc: 'Tap 30 to 1 in descending order. Reverse scanning patterns.',
+                    icon: <RotateCcw className="w-4 h-4 text-cyan-400 animate-spin-slow" />,
+                  },
+                  {
+                    id: 'even_odd',
+                    label: 'Even & Odd',
+                    desc: 'Odds first (1, 3, 5...), then Evens (2, 4, 6...). Extreme sorting.',
+                    icon: <Layers className="w-4 h-4 text-purple-400" />,
+                  },
+                  {
+                    id: 'shuffle',
+                    label: 'Shuffle',
+                    desc: 'Grid reshuffles after every correct tap! True muscle memory breaker.',
+                    icon: <Shuffle className="w-4 h-4 text-amber-400 animate-pulse" />,
+                  },
+                ].map((m) => {
+                  const active = gameMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        if (gameStatus === 'idle' || gameStatus === 'completed') {
+                          setGameMode(m.id as GameMode);
+                          sfx.playCountdown();
+                        } else if (window.confirm('Abandon active game to switch modes?')) {
+                          setGameMode(m.id as GameMode);
+                          sfx.playCountdown();
+                        }
+                      }}
+                      className={`group flex flex-col text-left p-3 rounded-xl border transition-all duration-300 relative overflow-hidden transform hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(0,0,0,0.5)] ${active
+                          ? 'bg-surface border-accent text-primary shadow-[0_0_15px_var(--theme-accent)] scale-[1.02] z-10 ring-1 ring-accent'
+                          : 'bg-base border-border-subtle text-muted hover:border-accent hover:text-primary hover:bg-surface/80'
+                        } cursor-pointer`}
+                      id={`mode-card-${m.id}`}
+                    >
+                      <div className="flex items-center gap-2.5 mb-2">
+                        <div className={`p-1.5 rounded-lg border transition-colors ${active ? 'bg-panel border-accent/30 shadow-inner' : 'bg-surface border-border-subtle group-hover:border-accent/50'}`}>
+                          {m.icon}
+                        </div>
+                        <span className="font-black text-sm tracking-wide">{m.label}</span>
+                      </div>
+                      <p className="text-[10px] text-muted font-mono leading-tight flex-1">
+                        {m.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        )
+      )}
 
       {/* Game Stage Area */}
-      <main className="max-w-5xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start" id="app-main-stage">
-        
-        {/* Playfield Area - Takes 7 Cols on desktop */}
-        <section className="lg:col-span-7 flex flex-col" id="playfield-area">
-          
-          {/* Real-time stats display */}
-          <StatsPanel
-            elapsedTime={elapsedTime}
-            accuracy={accuracyPercentage}
-            progress={progressPercentage}
-            bestTime={bestTime}
-            wrongTaps={wrongTaps}
-            cps={clicksPerSecond}
-          />
+      {(!isMultiplayerView || mp.room?.status === 'playing' || mp.room?.status === 'finished') && (
+        <main className="max-w-5xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start" id="app-main-stage">
 
-          {/* Target Sequence Queue Indicator */}
-          <div className="mb-4 bg-base border border-border-subtle p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="target-queue-indicator">
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-border-active text-base shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-              <span className="text-[11px] uppercase tracking-wider font-mono text-muted">Target Order:</span>
-              <span className="text-xs font-bold text-primary font-mono uppercase bg-surface px-2 py-0.5 rounded border border-border-subtle">
-                {getModeLabel(gameMode)}
-              </span>
-            </div>
+          {/* Playfield Area - Takes 7 Cols on desktop */}
+          <section className="lg:col-span-7 flex flex-col" id="playfield-area">
 
-            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 font-mono max-w-full custom-scrollbar">
-              <span className="text-[10px] text-muted uppercase shrink-0 mr-1">Queue:</span>
-              {activeSequence.slice(currentSeqIndex, currentSeqIndex + 6).map((num, idx) => {
-                const isCurrent = idx === 0;
-                return (
-                  <div key={`${num}-${idx}`} className="flex items-center gap-1.5 shrink-0">
-                    <div
-                      className={`flex items-center justify-center w-7 h-7 rounded font-bold transition-all ${
-                        isCurrent
-                          ? 'bg-border-active text-base text-base text-xs scale-110 shadow-[0_0_8px_rgba(255,255,255,0.3)] animate-pulse'
-                          : 'bg-surface text-muted text-[11px] border border-border-subtle/80'
-                      }`}
-                    >
-                      {num}
-                    </div>
-                    {idx < 5 && idx < activeSequence.length - currentSeqIndex - 1 && (
-                      <span className="text-neutral-700 text-[10px] font-sans">→</span>
-                    )}
-                  </div>
-                );
-              })}
-              {activeSequence.length - currentSeqIndex > 6 && (
-                <span className="text-neutral-600 text-[10px] shrink-0 font-sans ml-1">
-                  +{activeSequence.length - currentSeqIndex - 6} more
-                </span>
-              )}
-            </div>
-          </div>
+            {isMultiplayerView && mp.room && (
+              <MultiplayerMatch userId={getDeviceId()} room={mp.room} />
+            )}
 
-          {/* Core Interactive Play Zone */}
-          <div className="relative" id="interactive-grid-box">
-            {/* Interactive Grid component */}
-            <GameGrid
-              blocks={blocks}
-              nextNumber={nextNumber}
-              onTapNumber={handleTapNumber}
-              gameStatus={gameStatus}
+            {/* Real-time stats display */}
+            <StatsPanel
+              elapsedTime={elapsedTime}
+              accuracy={accuracyPercentage}
+              progress={progressPercentage}
+              bestTime={bestTime}
+              wrongTaps={wrongTaps}
+              cps={clicksPerSecond}
             />
-          </div>
-        </section>
 
-        {/* Leaderboard Rankings Area - Takes 5 Cols on desktop */}
-        <section className="lg:col-span-5" id="leaderboard-area">
-          <Leaderboard
-            entries={leaderboard}
-            onReset={handleResetLeaderboard}
-            currentScore={gameStatus === 'completed' ? elapsedTime : null}
-            selectedMode={gameMode}
-          />
-        </section>
-      </main>
+            {/* Target Sequence Queue Indicator */}
+            <div className="mb-4 bg-base border border-border-subtle p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="target-queue-indicator">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-border-active text-base shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+                <span className="text-[11px] uppercase tracking-wider font-mono text-muted">Target Order:</span>
+                <span className="text-xs font-bold text-primary font-mono uppercase bg-surface px-2 py-0.5 rounded border border-border-subtle">
+                  {getModeLabel(gameMode)}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 font-mono max-w-full custom-scrollbar">
+                <span className="text-[10px] text-muted uppercase shrink-0 mr-1">Queue:</span>
+                {activeSequence.slice(currentSeqIndex, currentSeqIndex + 6).map((num, idx) => {
+                  const isCurrent = idx === 0;
+                  return (
+                    <div key={`${num}-${idx}`} className="flex items-center gap-1.5 shrink-0">
+                      <div
+                        className={`flex items-center justify-center w-7 h-7 rounded font-bold transition-all ${isCurrent
+                            ? 'bg-border-active text-base text-base text-xs scale-110 shadow-[0_0_8px_rgba(255,255,255,0.3)] animate-pulse'
+                            : 'bg-surface text-muted text-[11px] border border-border-subtle/80'
+                          }`}
+                      >
+                        {num}
+                      </div>
+                      {idx < 5 && idx < activeSequence.length - currentSeqIndex - 1 && (
+                        <span className="text-neutral-700 text-[10px] font-sans">→</span>
+                      )}
+                    </div>
+                  );
+                })}
+                {activeSequence.length - currentSeqIndex > 6 && (
+                  <span className="text-neutral-600 text-[10px] shrink-0 font-sans ml-1">
+                    +{activeSequence.length - currentSeqIndex - 6} more
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Core Interactive Play Zone */}
+            <div className="relative" id="interactive-grid-box">
+              {/* Interactive Grid component */}
+              <GameGrid
+                blocks={blocks}
+                nextNumber={nextNumber}
+                onTapNumber={handleTapNumber}
+                gameStatus={gameStatus}
+              />
+            </div>
+          </section>
+
+          {/* Leaderboard Rankings Area - Takes 5 Cols on desktop */}
+          <section className="lg:col-span-5" id="leaderboard-area">
+            <Leaderboard
+              entries={leaderboard}
+              onReset={handleResetLeaderboard}
+              currentScore={gameStatus === 'completed' ? elapsedTime : null}
+              selectedMode={gameMode}
+            />
+          </section>
+        </main>
+      )}
 
       {/* Modal: Save Record Popup */}
       {showSaveModal && (
         <div className="fixed inset-0 bg-base/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="save-score-modal">
           <div className="bg-base border border-border-subtle rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl overflow-hidden animate-scale-pop">
-            
+
             {/* Top Close */}
             <button
               onClick={() => setShowSaveModal(false)}
@@ -684,7 +773,7 @@ export default function App() {
               <p className="text-xs text-muted font-mono mt-1">
                 You completed the <span className="text-primary underline">{getModeLabel(gameMode)}</span> reflex protocol.
               </p>
-              
+
               {/* Dynamically assigned rank */}
               <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold font-mono bg-surface border border-border-subtle">
                 <span className="text-muted text-xs uppercase">Rank Tier:</span>
@@ -727,10 +816,13 @@ export default function App() {
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowSaveModal(false)}
+                  onClick={() => {
+                    setShowSaveModal(false);
+                    resetGame();
+                  }}
                   className="flex-1 py-3 bg-surface hover:bg-panel text-muted hover:text-primary font-bold rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer border border-border-subtle"
                 >
-                  Discard
+                  Try Again
                 </button>
                 <button
                   type="submit"

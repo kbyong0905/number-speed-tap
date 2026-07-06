@@ -13,12 +13,31 @@
         "isPlayer": { "type": "boolean", "description": "True if submitted by the current user" }
       },
       "required": ["id", "name", "time", "accuracy", "date"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Represents a multiplayer game room",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "host": { "type": "object" },
+        "guest": { "type": "object" },
+        "gameMode": { "type": "string" },
+        "status": { "type": "string" },
+        "winnerId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["roomId", "gameMode", "status", "createdAt"]
     }
   },
   "firestore": {
     "leaderboard/{recordId}": {
       "schema": "#/entities/LeaderboardEntry",
       "description": "Collection of speed tap leaderboard entries"
+    },
+    "rooms/{roomId}": {
+      "schema": "#/entities/Room",
+      "description": "Collection of multiplayer game rooms"
     }
   }
 }
