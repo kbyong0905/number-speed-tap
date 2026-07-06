@@ -41,4 +41,12 @@ export interface Room {
   status: 'waiting' | 'starting' | 'playing' | 'finished';
   winnerId: string | null;
   createdAt: number;
+  messages?: ChatMessage[];
+}
+
+export interface ChatMessage {
+  playerId: string;
+  playerName: string;
+  text: string;
+  timestamp: number;
 }

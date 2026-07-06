@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, updateDoc, onSnapshot, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, getDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Room, GameMode, PlayerState } from '../types';
+import { Room, GameMode, PlayerState, ChatMessage } from '../types';
 
 export const useMultiplayer = (userId: string, userName: string) => {
   const [room, setRoom] = useState<Room | null>(null);
@@ -152,10 +152,16 @@ export const useMultiplayer = (userId: string, userName: string) => {
       [`${fieldPrefix}.progress`]: 30, // completed
     };
 
-    // If opponent hasn't finished yet, I am the winner
-    if (opponent?.status !== 'completed' && !room.winnerId) {
-      updateData.winnerId = userId;
-      updateData.status = 'finished'; // end room status
+    // If opponent has already finished, we can now compare times to find the winner
+    if (opponent?.status === 'completed' && opponent.time) {
+      if (time < opponent.time) {
+        updateData.winnerId = userId; // I win
+      } else if (opponent.time < time) {
+        updateData.winnerId = opponent.id; // They win
+      } else {
+        updateData.winnerId = 'tie'; // Tie
+      }
+      updateData.status = 'finished'; // End the room match
     }
 
     await updateDoc(doc(db, 'rooms', room.roomId), updateData);
@@ -181,6 +187,41 @@ export const useMultiplayer = (userId: string, userName: string) => {
     }
   };
 
+  const playAgain = async () => {
+    if (!room) return;
+    const isHost = room.host?.id === userId;
+    const fieldPrefix = isHost ? 'host' : 'guest';
+    const opponent = isHost ? room.guest : room.host;
+    
+    const updateData: any = {
+      [`${fieldPrefix}.status`]: 'waiting',
+      [`${fieldPrefix}.progress`]: 0,
+      [`${fieldPrefix}.time`]: null,
+      [`${fieldPrefix}.accuracy`]: null
+    };
+
+    // If opponent is already waiting, reset the room to waiting
+    if (opponent?.status === 'waiting') {
+      updateData.status = 'waiting';
+      updateData.winnerId = null;
+    }
+
+    await updateDoc(doc(db, 'rooms', room.roomId), updateData);
+  };
+
+  const sendMessage = async (text: string) => {
+    if (!room || !text.trim()) return;
+    const msg: ChatMessage = {
+      playerId: userId,
+      playerName: userName || 'Anonymous',
+      text: text.trim(),
+      timestamp: Date.now(),
+    };
+    await updateDoc(doc(db, 'rooms', room.roomId), {
+      messages: arrayUnion(msg),
+    });
+  };
+
   return {
     room,
     error,
@@ -190,6 +231,8 @@ export const useMultiplayer = (userId: string, userName: string) => {
     startGame,
     updateProgress,
     finishGame,
-    leaveRoom
+    leaveRoom,
+    sendMessage,
+    playAgain,
   };
 };

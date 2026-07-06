@@ -60,12 +60,14 @@ import {
   Layers,
   Zap,
   Palette,
-  Users
+  Users,
+  Copy
 } from 'lucide-react';
 
 import { useMultiplayer } from './hooks/useMultiplayer';
 import MultiplayerLobby from './components/MultiplayerLobby';
 import MultiplayerMatch from './components/MultiplayerMatch';
+import MultiplayerSidePanel from './components/MultiplayerSidePanel';
 
 const DEFAULT_LEADERBOARD: LeaderboardEntry[] = [];
 
@@ -136,6 +138,9 @@ export default function App() {
   // High precision timer refs
   const timerRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+
+  // Ref to scroll to game board automatically
+  const gameBoardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -292,12 +297,17 @@ export default function App() {
         setGameMode(mp.room.gameMode);
       }
 
+      // Scroll to the game board immediately
+      setTimeout(() => {
+        gameBoardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
       // Both are ready, start countdown
       resetGame();
-      setCountdown(3);
+      setCountdown(5);
       sfx.playCountdown();
 
-      let count = 3;
+      let count = 5;
       const interval = setInterval(() => {
         count--;
         if (count > 0) {
@@ -374,6 +384,7 @@ export default function App() {
 
         if (mp.room && isMultiplayerView) {
           mp.finishGame(finalT, accuracyPct);
+          // Wait for user to click "Play Again" on the post-match overlay
         } else {
           // Open save score prompt modal for Solo only
           setTimeout(() => {
@@ -574,18 +585,20 @@ export default function App() {
       {/* Mode Selection Dashboard - Visible when idle */}
       {gameStatus === 'idle' && (
         isMultiplayerView ? (
-          <MultiplayerLobby
-            userId={getDeviceId()}
-            room={mp.room}
-            error={mp.error}
-            createRoom={mp.createRoom}
-            joinRoom={mp.joinRoom}
-            setReady={mp.setReady}
-            leaveRoom={mp.leaveRoom}
-            onBack={() => setIsMultiplayerView(false)}
-            userName={playerName}
-            setUserName={setPlayerName}
-          />
+          !mp.room ? (
+            <MultiplayerLobby
+              userId={getDeviceId()}
+              room={mp.room}
+              error={mp.error}
+              createRoom={mp.createRoom}
+              joinRoom={mp.joinRoom}
+              setReady={mp.setReady}
+              leaveRoom={mp.leaveRoom}
+              onBack={() => setIsMultiplayerView(false)}
+              userName={playerName}
+              setUserName={setPlayerName}
+            />
+          ) : null
         ) : (
           <div className="max-w-5xl w-full mx-auto mb-6" id="game-dashboard-header">
             <div className="p-4 bg-base/80 border border-border-subtle rounded-2xl" id="game-mode-selector-panel">
@@ -668,11 +681,11 @@ export default function App() {
       )}
 
       {/* Game Stage Area */}
-      {(!isMultiplayerView || mp.room?.status === 'playing' || mp.room?.status === 'finished') && (
+      {(!isMultiplayerView || mp.room) && (
         <main className="max-w-5xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start" id="app-main-stage">
 
           {/* Playfield Area - Takes 7 Cols on desktop */}
-          <section className="lg:col-span-7 flex flex-col" id="playfield-area">
+          <section className="lg:col-span-7 flex flex-col relative" id="playfield-area" ref={gameBoardRef}>
 
             {isMultiplayerView && mp.room && (
               <MultiplayerMatch userId={getDeviceId()} room={mp.room} />
@@ -728,6 +741,102 @@ export default function App() {
 
             {/* Core Interactive Play Zone */}
             <div className="relative" id="interactive-grid-box">
+              {/* Multiplayer waiting overlay (before ready) */}
+              {isMultiplayerView && mp.room?.status === 'waiting' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-50 backdrop-blur-md bg-base/60 rounded-2xl border border-border-subtle p-6">
+                  <div className="bg-surface border border-border-subtle p-6 rounded-3xl text-center shadow-2xl max-w-sm w-full animate-scale-pop">
+                    <h2 className="text-xl font-black uppercase tracking-widest text-primary mb-6">Waiting Room</h2>
+                    
+                    <div className="bg-panel border border-border-subtle rounded-xl p-3 mb-6 flex items-center justify-between">
+                      <div className="text-left">
+                        <p className="text-[10px] text-muted uppercase tracking-widest font-mono">Room Code</p>
+                        <p className="text-2xl font-black text-primary font-mono tracking-[0.2em]">{mp.room.roomId}</p>
+                      </div>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(mp.room?.roomId || '')} 
+                        className="p-3 bg-surface hover:bg-border-subtle rounded-lg transition-colors border border-border-subtle cursor-pointer"
+                        title="Copy Code"
+                      >
+                        <Copy className="w-4 h-4 text-accent" />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col gap-3 mb-8">
+                      <div className="flex justify-between items-center p-3 rounded-xl bg-panel">
+                        <span className="font-bold text-sm truncate max-w-[120px]">{mp.room.host?.name || 'Host'}</span>
+                        <span className={`text-[10px] font-mono uppercase px-2 py-1 rounded ${mp.room.host?.status === 'ready' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                          {mp.room.host?.status || 'Waiting'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 rounded-xl bg-panel">
+                        <span className="font-bold text-sm truncate max-w-[120px]">{mp.room.guest?.name || 'Waiting...'}</span>
+                        <span className={`text-[10px] font-mono uppercase px-2 py-1 rounded ${!mp.room.guest ? 'bg-base text-muted' : mp.room.guest.status === 'ready' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                          {mp.room.guest ? mp.room.guest.status : 'Empty'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={mp.setReady}
+                      disabled={!mp.room.guest}
+                      className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all ${
+                        !mp.room.guest 
+                          ? 'bg-base border border-border-subtle text-muted cursor-not-allowed opacity-50' 
+                          : (mp.room.host?.id === getDeviceId() ? mp.room.host?.status : mp.room.guest?.status) === 'ready'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                            : 'bg-accent text-base hover:opacity-90 shadow-[0_0_15px_var(--theme-accent)]'
+                      }`}
+                    >
+                      {(mp.room.host?.id === getDeviceId() ? mp.room.host?.status : mp.room.guest?.status) === 'ready' ? 'Ready!' : 'Click to Ready'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Multiplayer finished overlay */}
+              {isMultiplayerView && mp.room?.status === 'finished' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-50 backdrop-blur-md bg-base/60 rounded-2xl border border-border-subtle p-6">
+                  <div className="bg-surface border border-border-subtle p-6 rounded-3xl text-center shadow-2xl max-w-sm w-full animate-scale-pop">
+                    <h2 className="text-2xl font-black uppercase tracking-widest text-primary mb-2">Match Ended</h2>
+                    <p className="text-sm font-mono text-muted mb-8">What would you like to do?</p>
+                    
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => {
+                          mp.playAgain();
+                          resetGame();
+                        }}
+                        className="w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all bg-accent text-base hover:opacity-90 shadow-[0_0_15px_var(--theme-accent)]"
+                      >
+                        Play Again
+                      </button>
+                      <button
+                        onClick={() => {
+                          mp.leaveRoom();
+                          setIsMultiplayerView(false);
+                          resetGame();
+                        }}
+                        className="w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all bg-panel border border-border-subtle text-red-400 hover:bg-red-500/10 hover:border-red-500/30"
+                      >
+                        Quit Match
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Multiplayer countdown overlay (centered on grid) */}
+              {isMultiplayerView && countdown !== null && (
+                <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none backdrop-blur-sm bg-base/40 rounded-2xl">
+                  <div className="flex flex-col items-center gap-2 animate-scale-pop">
+                    <span className="text-9xl font-black text-primary drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] animate-pulse" style={{ textShadow: '0 0 40px var(--theme-accent)' }}>
+                      {countdown}
+                    </span>
+                    <span className="text-sm font-mono uppercase tracking-widest text-muted">Get Ready!</span>
+                  </div>
+                </div>
+              )}
+
               {/* Interactive Grid component */}
               <GameGrid
                 blocks={blocks}
@@ -738,14 +847,23 @@ export default function App() {
             </div>
           </section>
 
-          {/* Leaderboard Rankings Area - Takes 5 Cols on desktop */}
+          {/* Right Panel: Leaderboard in solo, Live Match Panel in multiplayer */}
           <section className="lg:col-span-5" id="leaderboard-area">
-            <Leaderboard
-              entries={leaderboard}
-              onReset={handleResetLeaderboard}
-              currentScore={gameStatus === 'completed' ? elapsedTime : null}
-              selectedMode={gameMode}
-            />
+            {isMultiplayerView && mp.room ? (
+              <MultiplayerSidePanel
+                userId={getDeviceId()}
+                room={mp.room}
+                elapsedTime={elapsedTime}
+                sendMessage={mp.sendMessage}
+              />
+            ) : (
+              <Leaderboard
+                entries={leaderboard}
+                onReset={handleResetLeaderboard}
+                currentScore={gameStatus === 'completed' ? elapsedTime : null}
+                selectedMode={gameMode}
+              />
+            )}
           </section>
         </main>
       )}
